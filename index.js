@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
-var jwt = require('jsonwebtoken');
-var morgan = require('morgan')
+const jwt = require('jsonwebtoken');
+const morgan = require('morgan')
+const stripe = require('stripe')(process.env.STRIPE_secret_key)
+
 
 
 const app = express()
@@ -35,6 +37,7 @@ async function run() {
     const productsCollections = db.collection("products")
     const categoryCollections = db.collection("category")
     const cartCollections = db.collection("cart")
+    const paymentCollections = db.collection("payments")
 
 
     // //sent jwt 
@@ -73,12 +76,30 @@ async function run() {
       next();
     }
 
+    //get the category
+    app.get('/category', async (req, res) => {
+      const result = await categoryCollections.find().toArray()
+      res.send(result)
+    })
+    //post the category
+    app.post('/category', async (req, res) => {
+      const newCategory = req.body;
+      const result = await categoryCollections.insertOne(newCategory)
+      res.send(result)
+    })
+
     // get the users
 
-    // app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
-    //   const result = await usersCollections.find().toArray()
-    //   res.send(result)
-    // })
+    app.get('/users', async (req, res) => {
+      const result = await usersCollections.find().toArray()
+      res.send(result)
+    })
+    app.get('/users/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await usersCollections.findOne(query)
+      res.send(result)
+    })
     // app.get('/users/admin/:email', verifyToken,verifyAdmin, async (req, res) => {
     //   const email = req.params.email;
     //   if (email !== req.decoded.email) {
@@ -109,6 +130,21 @@ async function run() {
       })
       res.send(result)
     })
+
+
+    // update status
+    app.patch('/users/:id',async(req,res)=>{
+      const id = req.params.id;
+      const data = req.body;
+      const filter = {_id: new ObjectId(id)}
+      const UpdateStatus ={
+          $set :{
+              role: data.role
+          }
+      }
+      const result = await usersCollections.updateOne(filter, UpdateStatus)
+      res.send(result)
+  })
 
     // post product
 
@@ -168,7 +204,7 @@ async function run() {
     // cart delete
     app.get('/cart/:id', async (req, res) => {
       const id = req.params.id;
-      const query = { _id: id }
+      const query = { _id: new ObjectId(id) }
       const result = await cartCollections.findOne(query)
       res.send(result)
     })
@@ -176,18 +212,50 @@ async function run() {
  
     app.delete('/cart/:id', async (req, res) => {
       const id = req.params.id;
-      const query = { _id: id }
+      const query = { _id: new ObjectId(id) }
       const result = await cartCollections.deleteOne(query)
       res.send(result)
     })
-    
-    // app.delete('/purchaseFood/:id', async (req, res) => {
-    //   const id = req.params.id;
-    //   const query = { _id: new ObjectId(id) }
-    //   const result = await foodsPurchaseCollections.deleteOne(query)
-    //   res.send(result)
-    // })
 
+    // payment intent 
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, 'amount inside the intent')
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    });
+    //payment history 
+    app.post('/payments', async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollections.insertOne(payment);
+
+      //  carefully delete each item from the cart
+      console.log('payment info', payment);
+      const query = {
+        _id: {
+          $in: payment.cartIds.map(id => new ObjectId(id))
+        }
+      };
+
+      const deleteResult = await cartCollections.deleteMany(query);
+
+      res.send({ paymentResult, deleteResult });
+    })
+    //get payment history
+
+    app.get('/payments', async(req,res)=>{
+      const result = await paymentCollections.find().toArray()
+      res.send(result)
+    })
 
 
     // Send a ping to confirm a successful connection
