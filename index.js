@@ -81,10 +81,27 @@ async function run() {
       const result = await categoryCollections.find().toArray()
       res.send(result)
     })
+    app.get('/category:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await categoryCollections.findOne(query)
+      res.send(result)
+    })
     //post the category
     app.post('/category', async (req, res) => {
       const newCategory = req.body;
       const result = await categoryCollections.insertOne(newCategory)
+      res.send(result)
+    })
+    // patch` the category
+    app.patch('/category/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateData = {
+        $set: req.body
+      };
+      const result = await categoryCollections.updateOne(filter, updateData, options)
       res.send(result)
     })
 
@@ -133,18 +150,16 @@ async function run() {
 
 
     // update status
-    app.patch('/users/:id',async(req,res)=>{
+    app.patch('/users/:id', async (req, res) => {
       const id = req.params.id;
-      const data = req.body;
-      const filter = {_id: new ObjectId(id)}
-      const UpdateStatus ={
-          $set :{
-              role: data.role
-          }
-      }
-      const result = await usersCollections.updateOne(filter, UpdateStatus)
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateData = {
+        $set: req.body
+      };
+      const result = await usersCollections.updateOne(filter, updateData, options)
       res.send(result)
-  })
+    })
 
     // post product
 
