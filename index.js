@@ -38,6 +38,7 @@ async function run() {
     const categoryCollections = db.collection("category")
     const cartCollections = db.collection("cart")
     const paymentCollections = db.collection("payments")
+    const advertiseCollections = db.collection("advertise")
 
 
     // //sent jwt 
@@ -75,6 +76,7 @@ async function run() {
       }
       next();
     }
+    // ************ Category ************
 
     //get the category
     app.get('/category', async (req, res) => {
@@ -109,7 +111,10 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await categoryCollections.deleteOne(query)
-      res.send(result)})
+      res.send(result)
+    })
+
+      // ************ Users ************
 
     // get the users
 
@@ -138,6 +143,9 @@ async function run() {
     //   res.send({ admin });
     // })
 
+
+
+
     //post users data
     app.post('/users/:email', async (req, res) => {
       const newuser = req.body;
@@ -147,7 +155,8 @@ async function run() {
       if (existingUser) {
         return res.send(existingUser)
       }
-      const result = await usersCollections.insertOne({...newuser, 
+      const result = await usersCollections.insertOne({
+        ...newuser,
         timeStamp: Date.now(),
         role: "user"
       })
@@ -167,69 +176,79 @@ async function run() {
       res.send(result)
     })
 
+    // ************ Products ************
+
     // post product
 
-    app.post('/products', async(req,res)=>{
+    app.post('/products', async (req, res) => {
       const newProduct = req.body
       const result = await productsCollections.insertOne(newProduct)
       res.send(result)
     })
-    app.get('/products', async(req,res)=>{
+    app.get('/products', async (req, res) => {
       const result = await productsCollections.find().toArray()
       res.send(result)
     })
-  
- 
+
+
     app.get('/products/:param', async (req, res) => {
       const param = req.params.param;
       if (ObjectId.isValid(param)) {
 
         const query = { _id: new ObjectId(param) };
         const result = await productsCollections.findOne(query);
-    
+
         if (!result) {
           return res.status(404).send({ error: "Product not found by ID" });
         }
-    
+
         return res.send(result);
       }
       //find by email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (emailRegex.test(param)) {
-          const query = { sellerEmail: param }; 
-          const result = await productsCollections.find(query).toArray();
-  
-          if (result.length === 0) {
-              return res.status(404).send({ error: "No products found for this email" });
-          }
-  
-          return res.send(result);
+        const query = { sellerEmail: param };
+        const result = await productsCollections.find(query).toArray();
+
+        if (result.length === 0) {
+          return res.status(404).send({ error: "No products found for this email" });
+        }
+
+        return res.send(result);
       }
 
       const query = { category: param };
       const result = await productsCollections.find(query).toArray();
-    
+
       if (result.length === 0) {
         return res.status(404).send({ error: "No products found in this category" });
       }
-    
+
       res.send(result);
     });
+    app.delete('/products/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await productsCollections.deleteOne(query)
+      res.send(result)
+    })
+
+    // ************ Cart ************
 
     // post to the cart
 
-    app.post('/cart', async(req,res)=>{
+    app.post('/cart', async (req, res) => {
       const newItem = req.body;
-      const query = {_id : newItem._id}
+      const query = { _id: newItem._id }
       const axistItem = await cartCollections.findOne(query)
-      if(axistItem){
-        return res.send({message: "Already axist on the cart list"})
+      if (axistItem) {
+        return res.send({ message: "Already axist on the cart list" })
       }
 
       const result = await cartCollections.insertOne(newItem)
       res.send(result)
     })
-    app.get('/cart', async(req,res)=>{
+    app.get('/cart', async (req, res) => {
       const result = await cartCollections.find().toArray()
       res.send(result)
     })
@@ -242,13 +261,15 @@ async function run() {
       res.send(result)
     })
 
- 
+
     app.delete('/cart/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await cartCollections.deleteOne(query)
       res.send(result)
     })
+
+    // ************ Payment ************
 
     // payment intent 
     app.post('/create-payment-intent', async (req, res) => {
@@ -261,6 +282,8 @@ async function run() {
         currency: 'usd',
         payment_method_types: ['card']
       });
+      console.log(paymentIntent.client_secret);
+      
 
       res.send({
         clientSecret: paymentIntent.client_secret
@@ -285,7 +308,7 @@ async function run() {
     })
     //get payment history
 
-    app.get('/payments', async(req,res)=>{
+    app.get('/payments', async (req, res) => {
       const result = await paymentCollections.find().toArray()
       res.send(result)
     })
@@ -295,19 +318,30 @@ async function run() {
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (emailRegex.test(param)) {
-          const query = { email: param }; 
-          const result = await paymentCollections.find(query).toArray();
-  
-          if (result.length === 0) {
-              return res.status(404).send({ error: "No products found for this email" });
-          }
-  
-          return res.send(result);
+        const query = { email: param };
+        const result = await paymentCollections.find(query).toArray();
+
+        if (result.length === 0) {
+          return res.status(404).send({ error: "No products found for this email" });
+        }
+
+        return res.send(result);
       }
-      
-      const query = { _id: new ObjectId(param) }
-      const result = await paymentCollections.findOne(query)
-      res.send(result)
+      if (ObjectId.isValid(param)) {
+
+        const query = { _id: new ObjectId(param) };
+        const result = await paymentCollections.findOne(query);
+
+        if (!result) {
+          return res.status(404).send({ error: "Product not found by ID" });
+        }
+
+        return res.send(result);
+      }
+
+      // const query = { _id: new ObjectId(param) }
+      // const result = await paymentCollections.findOne(query)
+      // res.send(result)
     })
     //patch payment status
     app.patch('/payments/:id', async (req, res) => {
@@ -322,12 +356,41 @@ async function run() {
     })
 
 
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // ************ Advertise ************
+    app.post('/advertise', async(req,res)=>{
+      const newAdvertise = req.body;
+      const data = {...newAdvertise, status: 'pending'}
+      const result = await advertiseCollections.insertOne(data)
+      res.send(result)
+    })
+    app.get('/advertise', async(req,res)=>{
+      const result = await advertiseCollections.find().toArray()
+      res.send(result)
+    })
+    app.get('/advertise/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await advertiseCollections.findOne(query)
+      res.send(result)
+    })
+    app.delete('/advertise/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await advertiseCollections.deleteOne(query)
+      res.send(result)
+    })
+    app.patch('/advertise/:id', async(req,res)=>{
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateData = {
+        $set: req.body
+      };
+      const result = await advertiseCollections.updateOne(filter, updateData, options)
+      res.send(result)
+    })
   } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+
   }
 }
 run().catch(console.dir);
