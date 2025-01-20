@@ -104,6 +104,12 @@ async function run() {
       const result = await categoryCollections.updateOne(filter, updateData, options)
       res.send(result)
     })
+    // delete the category
+    app.delete('/category/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await categoryCollections.deleteOne(query)
+      res.send(result)})
 
     // get the users
 
@@ -269,6 +275,20 @@ async function run() {
 
     app.get('/payments', async(req,res)=>{
       const result = await paymentCollections.find().toArray()
+      res.send(result)
+    })
+    //get payment history by id
+    app.get('/payments/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await paymentCollections.findOne(query)
+      res.send(result)
+    })
+    //delete payment history
+    app.delete('/payments/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await paymentCollections.deleteOne(query)
       res.send(result)
     })
 
