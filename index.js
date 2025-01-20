@@ -284,11 +284,15 @@ async function run() {
       const result = await paymentCollections.findOne(query)
       res.send(result)
     })
-    //delete payment history
-    app.delete('/payments/:id', async (req, res) => {
+    //patch payment status
+    app.patch('/payments/:id', async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await paymentCollections.deleteOne(query)
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateData = {
+        $set: req.body
+      };
+      const result = await paymentCollections.updateOne(filter, updateData, options)
       res.send(result)
     })
 
