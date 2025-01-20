@@ -193,6 +193,18 @@ async function run() {
     
         return res.send(result);
       }
+      //find by email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(param)) {
+          const query = { sellerEmail: param }; 
+          const result = await productsCollections.find(query).toArray();
+  
+          if (result.length === 0) {
+              return res.status(404).send({ error: "No products found for this email" });
+          }
+  
+          return res.send(result);
+      }
 
       const query = { category: param };
       const result = await productsCollections.find(query).toArray();
@@ -278,9 +290,22 @@ async function run() {
       res.send(result)
     })
     //get payment history by id
-    app.get('/payments/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
+    app.get('/payments/:param', async (req, res) => {
+      const param = req.params.param;
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(param)) {
+          const query = { email: param }; 
+          const result = await paymentCollections.find(query).toArray();
+  
+          if (result.length === 0) {
+              return res.status(404).send({ error: "No products found for this email" });
+          }
+  
+          return res.send(result);
+      }
+      
+      const query = { _id: new ObjectId(param) }
       const result = await paymentCollections.findOne(query)
       res.send(result)
     })
