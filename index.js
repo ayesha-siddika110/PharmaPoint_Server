@@ -76,6 +76,35 @@ async function run() {
       }
       next();
     }
+    const verifyseller = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
+      const isSeller = user?.role === 'seller';
+      if (!isSeller) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    }
+    const verifyUser = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
+      const isUser = user?.role === 'user';
+      if (!isUser) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    }
+
+    // role verify
+
+    app.get('/users/role/:email', async(req,res)=>{
+      const email = req.params.email;
+      const query = { email: email }
+      const result = await usersCollections.findOne(query)
+      res.send({role: result?.role})
+    })
     // ************ Category ************
 
     //get the category
@@ -318,7 +347,8 @@ async function run() {
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (emailRegex.test(param)) {
-        const query = { email: param };
+
+        const query = { buyerEmail: param };
         const result = await paymentCollections.find(query).toArray();
 
         if (result.length === 0) {
