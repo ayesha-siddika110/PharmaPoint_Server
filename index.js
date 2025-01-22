@@ -10,9 +10,14 @@ const stripe = require('stripe')(process.env.STRIPE_secret_key)
 const app = express()
 const port = process.env.PORT || 3000
 
-app.use(cors())
+// app.use(cors())
 app.use(express.json())
 app.use(morgan('dev'))
+
+app.use(cors({
+  origin: ['http://localhost:5173'],
+  credentials: true
+}))
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -57,6 +62,8 @@ async function run() {
         return res.send(401).send({ message: 'unAuthorized access' })
       }
       const token = req.headers.authorization.split(' ')[1]
+      console.log(token);
+      
       jwt.verify(token, process.env.ACCESS_Token, (err, decoded) => {
         if (err) {
           return res.status(401).send({ message: 'unAuthorized access' })
@@ -119,13 +126,13 @@ async function run() {
       res.send(result)
     })
     //post the category
-    app.post('/category', async (req, res) => {
+    app.post('/category',verifyToken,verifyAdmin, async (req, res) => {
       const newCategory = req.body;
       const result = await categoryCollections.insertOne(newCategory)
       res.send(result)
     })
     // patch` the category
-    app.patch('/category/:id', async (req, res) => {
+    app.patch('/category/:id',verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -136,7 +143,7 @@ async function run() {
       res.send(result)
     })
     // delete the category
-    app.delete('/category/:id', async (req, res) => {
+    app.delete('/category/:id',verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await categoryCollections.deleteOne(query)
@@ -147,30 +154,17 @@ async function run() {
 
     // get the users
 
-    app.get('/users', async (req, res) => {
+    app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
       const result = await usersCollections.find().toArray()
       res.send(result)
     })
-    app.get('/users/:id', async (req, res) => {
+    app.get('/users/:id',verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await usersCollections.findOne(query)
       res.send(result)
     })
-    // app.get('/users/admin/:email', verifyToken,verifyAdmin, async (req, res) => {
-    //   const email = req.params.email;
-    //   if (email !== req.decoded.email) {
-    //     return res.status(403).send({ message: 'forbidden access' })
-    //   }
-
-    //   const query = { email: email };
-    //   const user = await usersCollections.findOne(query);
-    //   let admin = false;
-    //   if (user) {
-    //     admin = user?.role === 'admin';
-    //   }
-    //   res.send({ admin });
-    // })
+    
 
 
 
@@ -194,7 +188,7 @@ async function run() {
 
 
     // update status
-    app.patch('/users/:id', async (req, res) => {
+    app.patch('/users/:id',verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -209,7 +203,7 @@ async function run() {
 
     // post product
 
-    app.post('/products', async (req, res) => {
+    app.post('/products',verifyToken,verifyseller, async (req, res) => {
       const newProduct = req.body
       const result = await productsCollections.insertOne(newProduct)
       res.send(result)
@@ -219,7 +213,7 @@ async function run() {
       res.send(result)
     })
 
-
+      //TODO:check why i use email
     app.get('/products/:param', async (req, res) => {
       const param = req.params.param;
       if (ObjectId.isValid(param)) {
@@ -255,7 +249,7 @@ async function run() {
 
       res.send(result);
     });
-    app.delete('/products/:id', async (req, res) => {
+    app.delete('/products/:id',verifyToken,verifyseller, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await productsCollections.deleteOne(query)
@@ -266,7 +260,7 @@ async function run() {
 
     // post to the cart
 
-    app.post('/cart', async (req, res) => {
+    app.post('/cart',verifyToken, async (req, res) => {
       const newItem = req.body;
       const query = { _id: newItem._id }
       const axistItem = await cartCollections.findOne(query)
@@ -277,13 +271,13 @@ async function run() {
       const result = await cartCollections.insertOne(newItem)
       res.send(result)
     })
-    app.get('/cart', async (req, res) => {
+    app.get('/cart',verifyToken, async (req, res) => {
       const result = await cartCollections.find().toArray()
       res.send(result)
     })
 
     // cart delete
-    app.get('/cart/:id', async (req, res) => {
+    app.get('/cart/:id',verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await cartCollections.findOne(query)
@@ -291,7 +285,7 @@ async function run() {
     })
 
 
-    app.delete('/cart/:id', async (req, res) => {
+    app.delete('/cart/:id',verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await cartCollections.deleteOne(query)
@@ -301,7 +295,7 @@ async function run() {
     // ************ Payment ************
 
     // payment intent 
-    app.post('/create-payment-intent', async (req, res) => {
+    app.post('/create-payment-intent',verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount, 'amount inside the intent')
@@ -319,7 +313,7 @@ async function run() {
       })
     });
     //payment history 
-    app.post('/payments', async (req, res) => {
+    app.post('/payments',verifyToken, async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollections.insertOne(payment);
 
@@ -337,12 +331,14 @@ async function run() {
     })
     //get payment history
 
-    app.get('/payments', async (req, res) => {
+    // TODO: check verify admin ki na
+
+    app.get('/payments',verifyToken, async (req, res) => {
       const result = await paymentCollections.find().toArray()
       res.send(result)
     })
     //get payment history by id
-    app.get('/payments/:param', async (req, res) => {
+    app.get('/payments/:param',verifyToken, async (req, res) => {
       const param = req.params.param;
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -374,7 +370,7 @@ async function run() {
       // res.send(result)
     })
     //patch payment status
-    app.patch('/payments/:id', async (req, res) => {
+    app.patch('/payments/:id',verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -387,7 +383,7 @@ async function run() {
 
 
     // ************ Advertise ************
-    app.post('/advertise', async(req,res)=>{
+    app.post('/advertise',verifyToken,verifyseller,async(req,res)=>{
       const newAdvertise = req.body;
       const data = {...newAdvertise, status: 'pending'}
       const result = await advertiseCollections.insertOne(data)
@@ -403,13 +399,13 @@ async function run() {
       const result = await advertiseCollections.findOne(query)
       res.send(result)
     })
-    app.delete('/advertise/:id', async(req,res)=>{
+    app.delete('/advertise/:id',verifyToken, async(req,res)=>{
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await advertiseCollections.deleteOne(query)
       res.send(result)
     })
-    app.patch('/advertise/:id', async(req,res)=>{
+    app.patch('/advertise/:id',verifyToken,verifyAdmin, async(req,res)=>{
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
