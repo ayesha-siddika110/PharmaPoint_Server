@@ -104,6 +104,7 @@ async function run() {
       next();
     }
 
+
     // role verify
 
     app.get('/users/role/:email', async(req,res)=>{
@@ -208,11 +209,32 @@ async function run() {
       const result = await productsCollections.insertOne(newProduct)
       res.send(result)
     })
-    app.get('/products', async (req, res) => {
-      const result = await productsCollections.find().toArray()
-      res.send(result)
-    })
-
+    // app.get('/products', async (req, res) => {
+    //   const result = await productsCollections.find().toArray()
+    //   res.send(result)
+    // })
+    app.get("/products", async (req, res) => {
+      try {
+        const { page = 1, limit = 8 } = req.query;
+        const skip = (page - 1) * limit;
+    
+        const products = await productsCollections
+          .find({})
+          .skip(skip)
+          .limit(parseInt(limit))
+          .toArray(); // Convert cursor to plain array
+    
+        const totalProducts = await productsCollections.estimatedDocumentCount();
+    
+        res.json({
+          products,
+          totalPages: Math.ceil(totalProducts / limit),
+        });
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
       //TODO:check why i use email
     app.get('/products/:param', async (req, res) => {
       const param = req.params.param;
@@ -260,7 +282,7 @@ async function run() {
 
     // post to the cart
 
-    app.post('/cart',verifyToken, async (req, res) => {
+    app.post('/cart', async (req, res) => {
       const newItem = req.body;
       const query = { _id: newItem._id }
       const axistItem = await cartCollections.findOne(query)
@@ -271,13 +293,13 @@ async function run() {
       const result = await cartCollections.insertOne(newItem)
       res.send(result)
     })
-    app.get('/cart',verifyToken, async (req, res) => {
+    app.get('/cart', async (req, res) => {
       const result = await cartCollections.find().toArray()
       res.send(result)
     })
 
     // cart delete
-    app.get('/cart/:id',verifyToken, async (req, res) => {
+    app.get('/cart/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await cartCollections.findOne(query)
@@ -285,7 +307,7 @@ async function run() {
     })
 
 
-    app.delete('/cart/:id',verifyToken, async (req, res) => {
+    app.delete('/cart/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await cartCollections.deleteOne(query)
@@ -295,7 +317,7 @@ async function run() {
     // ************ Payment ************
 
     // payment intent 
-    app.post('/create-payment-intent',verifyToken, async (req, res) => {
+    app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount, 'amount inside the intent')
@@ -313,7 +335,7 @@ async function run() {
       })
     });
     //payment history 
-    app.post('/payments',verifyToken, async (req, res) => {
+    app.post('/payments', async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollections.insertOne(payment);
 
@@ -333,12 +355,12 @@ async function run() {
 
     // TODO: check verify admin ki na
 
-    app.get('/payments',verifyToken, async (req, res) => {
+    app.get('/payments',async (req, res) => {
       const result = await paymentCollections.find().toArray()
       res.send(result)
     })
     //get payment history by id
-    app.get('/payments/:param',verifyToken, async (req, res) => {
+    app.get('/payments/:param', async (req, res) => {
       const param = req.params.param;
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -415,6 +437,17 @@ async function run() {
       const result = await advertiseCollections.updateOne(filter, updateData, options)
       res.send(result)
     })
+
+    app.get('/adminState',async(req,res)=>{
+      const totalRevenue = await paymentCollections.estimatedDocumentCount()
+      const totalPaid = await paymentCollections.countDocuments({status: 'paid'})
+      const totalPending = await paymentCollections.countDocuments({status: 'pending'})
+      res.send({totalRevenue, totalPaid, totalPending})
+    })
+
+
+
+
   } finally {
 
   }
