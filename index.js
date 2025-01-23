@@ -14,10 +14,7 @@ const port = process.env.PORT || 3000
 app.use(express.json())
 app.use(morgan('dev'))
 
-app.use(cors({
-  origin: ['http://localhost:5173'],
-  credentials: true
-}))
+app.use(cors())
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -45,6 +42,10 @@ async function run() {
     const paymentCollections = db.collection("payments")
     const advertiseCollections = db.collection("advertise")
 
+    const newPayments = await paymentCollections.find().sort({ createdAt: -1 }).limit(10).toArray();
+    console.log(newPayments);
+
+
 
     // //sent jwt 
     app.post('/jwt', async (req, res) => {
@@ -63,7 +64,7 @@ async function run() {
       }
       const token = req.headers.authorization.split(' ')[1]
       console.log(token);
-      
+
       jwt.verify(token, process.env.ACCESS_Token, (err, decoded) => {
         if (err) {
           return res.status(401).send({ message: 'unAuthorized access' })
@@ -107,11 +108,11 @@ async function run() {
 
     // role verify
 
-    app.get('/users/role/:email', async(req,res)=>{
+    app.get('/users/role/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email: email }
       const result = await usersCollections.findOne(query)
-      res.send({role: result?.role})
+      res.send({ role: result?.role })
     })
     // ************ Category ************
 
@@ -127,13 +128,13 @@ async function run() {
       res.send(result)
     })
     //post the category
-    app.post('/category',verifyToken,verifyAdmin, async (req, res) => {
+    app.post('/category', verifyToken, verifyAdmin, async (req, res) => {
       const newCategory = req.body;
       const result = await categoryCollections.insertOne(newCategory)
       res.send(result)
     })
     // patch` the category
-    app.patch('/category/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.patch('/category/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -144,28 +145,52 @@ async function run() {
       res.send(result)
     })
     // delete the category
-    app.delete('/category/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.delete('/category/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await categoryCollections.deleteOne(query)
       res.send(result)
     })
 
-      // ************ Users ************
+    // ************ Users ************
 
     // get the users
 
-    app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
+    app.get('/users', async (req, res) => {
       const result = await usersCollections.find().toArray()
       res.send(result)
     })
-    app.get('/users/:id',verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await usersCollections.findOne(query)
-      res.send(result)
+    app.get('/users/:param', async (req, res) => {
+      // const id = req.params.param;
+      // const query = { _id: new ObjectId(id) }
+      // const result = await usersCollections.findOne(query)
+      // res.send(result)
+      const param = req.params.param;
+      if (ObjectId.isValid(param)) {
+
+        const query = { _id: new ObjectId(param) };
+        const result = await usersCollections.findOne(query);
+
+        if (!result) {
+          return res.status(404).send({ error: "Product not found by ID" });
+        }
+
+        return res.send(result);
+      }
+      //find by email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(param)) {
+        const query = { email: param };
+        const result = await usersCollections.findOne(query);
+
+        if (result.length === 0) {
+          return res.status(404).send({ error: "No products found for this email" });
+        }
+
+        return res.send(result);
+      }
     })
-    
+
 
 
 
@@ -177,19 +202,18 @@ async function run() {
       const query = { email }
       const existingUser = await usersCollections.findOne(query)
       if (existingUser) {
-        return res.send(existingUser)
+        return res.send('existing User')
       }
       const result = await usersCollections.insertOne({
         ...newuser,
         timeStamp: Date.now(),
-        role: "user"
       })
       res.send(result)
     })
 
 
     // update status
-    app.patch('/users/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.patch('/users/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -204,7 +228,7 @@ async function run() {
 
     // post product
 
-    app.post('/products',verifyToken,verifyseller, async (req, res) => {
+    app.post('/products', async (req, res) => {
       const newProduct = req.body
       const result = await productsCollections.insertOne(newProduct)
       res.send(result)
@@ -217,15 +241,15 @@ async function run() {
       try {
         const { page = 1, limit = 8 } = req.query;
         const skip = (page - 1) * limit;
-    
+
         const products = await productsCollections
           .find({})
           .skip(skip)
           .limit(parseInt(limit))
           .toArray(); // Convert cursor to plain array
-    
+
         const totalProducts = await productsCollections.estimatedDocumentCount();
-    
+
         res.json({
           products,
           totalPages: Math.ceil(totalProducts / limit),
@@ -235,7 +259,7 @@ async function run() {
         res.status(500).send("Internal Server Error");
       }
     });
-      //TODO:check why i use email
+    //TODO:check why i use email
     app.get('/products/:param', async (req, res) => {
       const param = req.params.param;
       if (ObjectId.isValid(param)) {
@@ -271,7 +295,7 @@ async function run() {
 
       res.send(result);
     });
-    app.delete('/products/:id',verifyToken,verifyseller, async (req, res) => {
+    app.delete('/products/:id', verifyToken, verifyseller, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await productsCollections.deleteOne(query)
@@ -328,7 +352,7 @@ async function run() {
         payment_method_types: ['card']
       });
       console.log(paymentIntent.client_secret);
-      
+
 
       res.send({
         clientSecret: paymentIntent.client_secret
@@ -355,7 +379,7 @@ async function run() {
 
     // TODO: check verify admin ki na
 
-    app.get('/payments',async (req, res) => {
+    app.get('/payments', async (req, res) => {
       const result = await paymentCollections.find().toArray()
       res.send(result)
     })
@@ -392,7 +416,7 @@ async function run() {
       // res.send(result)
     })
     //patch payment status
-    app.patch('/payments/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.patch('/payments/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -405,29 +429,29 @@ async function run() {
 
 
     // ************ Advertise ************
-    app.post('/advertise',verifyToken,verifyseller,async(req,res)=>{
+    app.post('/advertise', verifyToken, verifyseller, async (req, res) => {
       const newAdvertise = req.body;
-      const data = {...newAdvertise, status: 'pending'}
+      const data = { ...newAdvertise, status: 'pending' }
       const result = await advertiseCollections.insertOne(data)
       res.send(result)
     })
-    app.get('/advertise', async(req,res)=>{
+    app.get('/advertise', async (req, res) => {
       const result = await advertiseCollections.find().toArray()
       res.send(result)
     })
-    app.get('/advertise/:id', async(req,res)=>{
+    app.get('/advertise/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await advertiseCollections.findOne(query)
       res.send(result)
     })
-    app.delete('/advertise/:id',verifyToken, async(req,res)=>{
+    app.delete('/advertise/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await advertiseCollections.deleteOne(query)
       res.send(result)
     })
-    app.patch('/advertise/:id',verifyToken,verifyAdmin, async(req,res)=>{
+    app.patch('/advertise/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
@@ -438,11 +462,28 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/adminState',async(req,res)=>{
+    app.get('/adminState', async (req, res) => {
       const totalRevenue = await paymentCollections.estimatedDocumentCount()
-      const totalPaid = await paymentCollections.countDocuments({status: 'paid'})
-      const totalPending = await paymentCollections.countDocuments({status: 'pending'})
-      res.send({totalRevenue, totalPaid, totalPending})
+      const totalPaid = await paymentCollections.countDocuments({ status: 'paid' })
+      const totalPending = await paymentCollections.countDocuments({ status: 'pending' })
+      res.send({ totalRevenue, totalPaid, totalPending })
+    })
+    app.get('/sellerState/:email', async (req, res) => {
+      const email = req.params.email;
+      const sellerPayments = await paymentCollections.find({ sellerEmail: email, status: 'paid' }).toArray();
+      const revenue = sellerPayments.reduce((acc, payment) => acc + parseFloat(payment.price), 0);
+      const sellerRevenue = revenue / 100
+
+      const totalPaid = sellerPayments.filter(payment => payment.status === 'paid').length;
+      const totalPending = await paymentCollections.countDocuments({ sellerEmail: email, status: 'pending' });
+
+      res.send({
+        sellerRevenue,
+        totalPaid,
+        totalPending,
+      });
+
+
     })
 
 
