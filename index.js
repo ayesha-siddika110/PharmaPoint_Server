@@ -122,6 +122,7 @@ async function run() {
       res.send(result)
     })
     app.get('/category:id', async (req, res) => {
+      
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await categoryCollections.findOne(query)
@@ -238,27 +239,52 @@ async function run() {
     //   res.send(result)
     // })
     app.get("/products", async (req, res) => {
+      const { page = 1, limit = 8, search } = req.query; // Get query parameters
+      const skip = (page - 1) * limit; // Calculate number of documents to skip
+    
       try {
-        const { page = 1, limit = 8 } = req.query;
-        const skip = (page - 1) * limit;
-
-        const products = await productsCollections
-          .find({})
-          .skip(skip)
-          .limit(parseInt(limit))
-          .toArray(); // Convert cursor to plain array
-
-        const totalProducts = await productsCollections.estimatedDocumentCount();
-
-        res.json({
-          products,
-          totalPages: Math.ceil(totalProducts / limit),
-        });
+        if (page || limit || search) {
+          // Create a query object for search functionality
+          let query = {};
+    
+          // Add search condition only if 'search' exists
+          if (search) {
+            query.productName = {
+              $regex: String(search),
+              $options: "i" // Case-insensitive search
+            };
+          }
+    
+          // Fetch products based on pagination and search
+          const products = await productsCollections
+            .find(query)
+            .skip(skip)
+            .limit(parseInt(limit))
+            .toArray();
+    
+          // Get total number of products that match the query
+          const totalProducts = await productsCollections.countDocuments(query);
+    
+          // Send paginated response
+          return res.json({
+            products,
+            totalPages: Math.ceil(totalProducts / limit),
+            currentPage: parseInt(page),
+            totalProducts,
+          });
+        }
+    
+        // Default: Fetch all products if no pagination or search
+        const result = await productsCollections.find().toArray();
+        res.json(result);
       } catch (error) {
+        // Handle errors gracefully
         console.error("Error fetching products:", error);
-        res.status(500).send("Internal Server Error");
+        res.status(500).json({ error: "Failed to fetch products" });
       }
     });
+    
+
     //TODO:check why i use email
     app.get('/products/:param', async (req, res) => {
       const param = req.params.param;
@@ -321,14 +347,43 @@ async function run() {
       const result = await cartCollections.find().toArray()
       res.send(result)
     })
+    app.get('/cart/:param', async(req,res)=>{
+      const param = req.params.param;
 
-    // cart delete
-    app.get('/cart/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await cartCollections.findOne(query)
-      res.send(result)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(param)) {
+
+        const query = { buyerEmail: param };
+        const result = await cartCollections.find(query).toArray();
+
+        if (result.length === 0) {
+          return res.status(404).send({ error: "No products found for this email" });
+        }
+
+        return res.send(result);
+      }
+      if (ObjectId.isValid(param)) {
+
+        const query = { _id: new ObjectId(param) };
+        const result = await cartCollections.findOne(query);
+
+        if (!result) {
+          return res.status(404).send({ error: "Product not found by ID" });
+        }
+
+        return res.send(result);
+      }
+
+     
     })
+
+
+    // app.get('/cart/:id', async (req, res) => {
+    //   const id = req.params.id;
+    //   const query = { _id: new ObjectId(id) }
+    //   const result = await cartCollections.findOne(query)
+    //   res.send(result)
+    // })
 
 
     app.delete('/cart/:id', async (req, res) => {
@@ -439,11 +494,32 @@ async function run() {
       const result = await advertiseCollections.find().toArray()
       res.send(result)
     })
-    app.get('/advertise/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await advertiseCollections.findOne(query)
-      res.send(result)
+    app.get('/advertise/:param', async (req, res) => {
+      const param = req.params.param;
+      if (ObjectId.isValid(param)) {
+
+        const query = { _id: new ObjectId(param) };
+        const result = await advertiseCollections.findOne(query);
+
+        if (!result) {
+          return res.status(404).send({ error: "advertise not found by ID" });
+        }
+
+        return res.send(result);
+      }
+      //find by email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(param)) {
+        const query = { sellerEmail: param };
+        const result = await advertiseCollections.find(query).toArray();
+
+        if (result.length === 0) {
+          return res.status(404).send({ error: "No products found for this email" });
+        }
+
+        return res.send(result);
+      }
+
     })
     app.delete('/advertise/:id', async (req, res) => {
       const id = req.params.id;
